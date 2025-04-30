@@ -1,0 +1,592 @@
+{
+  "name": "DZ Interns Summary Email AI Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 7 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -980,
+        -140
+      ],
+      "id": "aa58be8f-f615-431b-8fea-7f14c83ba31f",
+      "name": "Schedule Trigger",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "model": "google/gemini-2.0-flash-exp:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        120,
+        80
+      ],
+      "id": "de243d07-72a7-4c8e-9e99-366f94fbe784",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "6FcMXX6mTYZsiMoD",
+          "name": "OpenRouter account(R)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "from datetime import datetime\n\n# Get team progress from input\nteam_progress_data = items[0]['json'].get('team progress', '')\n\n# Handle both dict and string types\nif isinstance(team_progress_data, dict):\n    team_progress = team_progress_data.get('team_progress', '').strip()\nelif isinstance(team_progress_data, str):\n    team_progress = team_progress_data.strip()\nelse:\n    team_progress = ''\n\n# Fallback if no progress is available\nif not team_progress:\n    team_progress = \"No intern updates received today.\"\n\n# Format date\ntoday = datetime.now().strftime(\"%B %d, %Y\")  # e.g. April 21, 2025\n\n# Construct the email body\nemail_body = f\"\"\"\nHello Team,\n\nThe intern updates have been successfully recorded in the Google Sheet for {today}.\n\n\n{team_progress}\n\nYou can view the full updates here:\nhttps://docs.google.com/spreadsheets/d/1HJan-dk6-nPtXk15cvkMXqTwtS8Xf1v7XBbIgaBZ9vo/edit?gid=0#gid=0\n\nRegards,  \nDZ AI Agent\n\"\"\"\n\n# Return the email body to the next node\nreturn [{\n    \"json\": {\n        \"email_body\": email_body\n    }\n}]\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        -160
+      ],
+      "id": "3ddfd3b8-2a94-4f65-b770-752e5c48089b",
+      "name": "Format Email Summary"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "57c0632a-56bb-4d6e-b5a1-4fbe282e0b76",
+              "leftValue": "={{ new Date($json.headers.date).toDateString() }}\n",
+              "rightValue": "={{ new Date().toDateString() }}\n",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -540,
+        -140
+      ],
+      "id": "caf5efa5-1f76-4409-8fa1-9432d133dc02",
+      "name": "Today?"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "returnAll": true,
+        "simple": false,
+        "filters": {
+          "q": "from:(mjakash2212@gmail.com OR indhureddy369@gmail.com OR bhavyatm07@gmail.com) subject:(\"Daily updates\" OR \"Summary\" OR \"Daily Progress worksheet\" OR \"Daily Progress\")"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -780,
+        -140
+      ],
+      "id": "f68515e2-36bf-4e66-9039-ffc685bf5de9",
+      "name": "Get mail from Interns",
+      "webhookId": "814eb392-1879-4ea7-aba9-2b50d396fe13",
+      "alwaysOutputData": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "xhZ79tnTgzuJMJra",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6e69f06b-23e5-4a6b-8aee-260ae5d91753",
+              "name": "Email",
+              "value": "={{ $json.headers.from }}",
+              "type": "string"
+            },
+            {
+              "id": "6d44f494-4fbc-44e6-af09-8a5c66e82e9d",
+              "name": "Date",
+              "value": "={{ $json.headers.date }}",
+              "type": "string"
+            },
+            {
+              "id": "c4ff5c46-b157-4263-9554-c057be9cffc7",
+              "name": "Content",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -300,
+        -160
+      ],
+      "id": "41dc888a-b271-441b-af96-1493986ef628",
+      "name": "Set node"
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "combined_updates = []\n\nfor item in items:\n    date = item['json'].get('Date', '')\n    email = item['json'].get('Email', 'Unknown')\n    content = item['json'].get('Content', '[No update]')\n    \n    update = f\"Date: {date}\\nFrom: {email}\\nUpdate:\\n{content}\"\n    combined_updates.append(update)\n\ncombined_text = \"\\n\\n\".join(combined_updates)\n\nreturn [{\n    \"json\": {\n        \"all_updates\": combined_text\n    }\n}]\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        -160
+      ],
+      "id": "93c784de-470c-42c0-8e8c-576bf16b44df",
+      "name": "All updates"
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "import json\nimport re\n\n# Get the raw AI output\nai_output = items[0]['json'].get('output', '').strip()\n\n# Remove triple backticks and 'json' tag (if present)\ncleaned_output = re.sub(r'^```json|^```|```$', '', ai_output.strip(), flags=re.MULTILINE).strip()\n\n# Debug: Check if output is empty\nif not cleaned_output:\n    raise ValueError(\"AI output is empty after cleaning. Cannot parse JSON.\")\n\n# Try to parse cleaned JSON\ntry:\n    data = json.loads(cleaned_output)\nexcept json.JSONDecodeError as e:\n    raise ValueError(f\"Failed to parse AI output:\\n{cleaned_output}\") from e\n\n# Convert into n8n format for further use\nresult = []\n\n# Ensure 'summaries' is a list of dictionaries\nsummaries = data.get('summaries', [])\nif isinstance(summaries, list):\n    for entry in summaries:\n        if isinstance(entry, dict):\n            result.append({\n                'json': {\n                    'Name': entry.get('name', ''),\n                    'Date': entry.get('date', ''),\n                    'Summary': entry.get('summary', '')\n                }\n            })\n        else:\n            raise ValueError(f\"Expected a dictionary but got {type(entry)}.\")\nelse:\n    raise ValueError(f\"Expected 'summaries' to be a list but got {type(summaries)}.\")\n\n# Return the final result\nreturn result\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        -160
+      ],
+      "id": "ddf407df-3850-475d-a95f-57dee0671cc1",
+      "name": "Name,Date and Summary"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1HJan-dk6-nPtXk15cvkMXqTwtS8Xf1v7XBbIgaBZ9vo",
+          "mode": "list",
+          "cachedResultName": "Interns Summary",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1HJan-dk6-nPtXk15cvkMXqTwtS8Xf1v7XBbIgaBZ9vo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Interns Summary Data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1HJan-dk6-nPtXk15cvkMXqTwtS8Xf1v7XBbIgaBZ9vo/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Summary": "={{ $json.Summary }}",
+            "Date ": "={{ $json.Date }}",
+            "Name ": "={{ $json.Name }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date ",
+              "displayName": "Date ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Name ",
+              "displayName": "Name ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Summary",
+              "displayName": "Summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        780,
+        -160
+      ],
+      "id": "1a93d3bb-f026-4e16-b373-3391f162893d",
+      "name": "Interns Summary",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "9UXjLS7Y26bCfYaS",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "shilpa.shetti@digizura.com",
+        "subject": "=Intern Summary for {{ $now.toISODate() }}",
+        "emailType": "text",
+        "message": "={{ $json.email_body }}",
+        "options": {
+          "ccList": ""
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2160,
+        -160
+      ],
+      "id": "f25e3ab5-32ee-48f9-8c83-ee9ee19bff56",
+      "name": "Send mail to team",
+      "webhookId": "d8a12687-24cb-47d8-b77e-01bef14d1e69",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "xhZ79tnTgzuJMJra",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "google/gemini-2.0-flash-exp:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1160,
+        80
+      ],
+      "id": "51e8f48f-46ac-4069-a27f-e3f2ee06861e",
+      "name": "OpenRouter Chat Model1",
+      "credentials": {
+        "openRouterApi": {
+          "id": "6FcMXX6mTYZsiMoD",
+          "name": "OpenRouter account(R)"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -340,
+        80
+      ],
+      "id": "9aff72e9-d1d0-4217-b186-9d4b08a84ccd",
+      "name": "No interns Update Recevied Today"
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "# Combine intern summaries into a single formatted string\nsummaries = []\n\nfor item in items:\n    name = item['json'].get('Name ', '').strip()\n    summary = item['json'].get('Summary', '').strip()\n    if name and summary:\n        summaries.append(f\"- {name}: {summary}\")\n\ncombined = \"\\n\".join(summaries)\n\nreturn [{\n    \"json\": {\n        \"combinedSummaries\": combined\n    }\n}]\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        -160
+      ],
+      "id": "b7c0c718-9af9-403d-b329-f1aa6236914a",
+      "name": "Combine/Merge Summary"
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "import re\n\n# Get AI response\ntext = items[0]['json'].get('team progress', '')\n\n# Remove any code block markers like ```json or ``` or ```\ntext = re.sub(r\"```[a-z]*\\n?\", \"\", text, flags=re.IGNORECASE)\ntext = re.sub(r\"```\", \"\", text)\n\n# Intern names to detect and keep in the output\nintern_names = [\"Indhu\", \"Bhavya\", \"Akash\"]\n\n# Split into sentences\nsentences = re.split(r'(?<=[.!?])\\s+', text)\n\n# Filter sentences that mention any intern name\nfiltered = [s for s in sentences if any(name.lower() in s.lower() for name in intern_names)]\n\n# Function to clean and keep intern names\ndef keep_names(sentence):\n    # Ensure intern names appear properly formatted in the sentence\n    for name in intern_names:\n        sentence = re.sub(rf'\\b{name}\\b', name, sentence, flags=re.IGNORECASE)\n    return sentence.strip(\" ,.-\")\n\n# Format each line as a clean bullet point with intern names\nfinal_lines = [f\" - {keep_names(s)}\" for s in filtered]\n\n# Final output without any curly braces or extraneous characters\nclean_output = \"Interns Progress:\\n\" + \"\\n\".join(final_lines)\n\n\n# Return the result with intern names included and no curly braces\nreturn [{\n    'json': {\n        'team progress': clean_output.strip()\n    }\n}]\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        -160
+      ],
+      "id": "b4d81eeb-ddec-4245-8dd1-ec1835f1d3b5",
+      "name": "Cleanup the Format(Team Progress)"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Summarize the following intern updates into well-formatted messages.\n\nReturn a JSON object with:\n\n- `summaries`: a JSON array where each object includes:\n  - `name`\n  - `date`\n  - `summary` (a paragraph combining their update)\n\n\n\nIntern updates:\n{{ $json.all_updates }}\n\nReturn only raw JSON without triple backticks or markdown formatting.\n",
+        "options": {
+          "systemMessage": "You are an assistant that returns structured JSON in this format:\n[\n  {\n    \"name\": \"Intern Name\",\n    \"date\": \"2025-04-08\",\n    \"summary\": \"Did X, Y, Z tasks\"\n  },\n  ...\n]\n\nReturn only raw JSON without triple backticks or formatting.\n\n\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        140,
+        -160
+      ],
+      "id": "696ed437-189e-4958-8d2b-52d1e8a4a02d",
+      "name": "Generate the AI Summary"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You will receive a list of intern summaries.\n\nYour task:\n- Based on the intern summaries, write a **concise team progress report**.\n- Mention team momentum, blockers, collaboration, and suggestions if any.\n\nInput:\n{{ $json.combinedSummaries }}\n\nOutput only this:\n Interns_Progress:\n \"...\"\n\nDo not include curly braces in the output.\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        1240,
+        -160
+      ],
+      "id": "7fbfae92-3969-4d14-83b3-88db92088f7c",
+      "name": "Generate the AI Team Progress"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "862331c6-6a88-40af-a153-e1bfd78f6291",
+              "name": "team progress",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1600,
+        -160
+      ],
+      "id": "6c0f5555-959d-4f7c-8c3f-fdf5341a5be7",
+      "name": "Set Fields"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get mail from Interns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate the AI Summary",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Email Summary": {
+      "main": [
+        [
+          {
+            "node": "Send mail to team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Today?": {
+      "main": [
+        [
+          {
+            "node": "Set node",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No interns Update Recevied Today",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get mail from Interns": {
+      "main": [
+        [
+          {
+            "node": "Today?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set node": {
+      "main": [
+        [
+          {
+            "node": "All updates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "All updates": {
+      "main": [
+        [
+          {
+            "node": "Generate the AI Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Name,Date and Summary": {
+      "main": [
+        [
+          {
+            "node": "Interns Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interns Summary": {
+      "main": [
+        [
+          {
+            "node": "Combine/Merge Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate the AI Team Progress",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine/Merge Summary": {
+      "main": [
+        [
+          {
+            "node": "Generate the AI Team Progress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleanup the Format(Team Progress)": {
+      "main": [
+        [
+          {
+            "node": "Format Email Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate the AI Summary": {
+      "main": [
+        [
+          {
+            "node": "Name,Date and Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate the AI Team Progress": {
+      "main": [
+        [
+          {
+            "node": "Set Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Fields": {
+      "main": [
+        [
+          {
+            "node": "Cleanup the Format(Team Progress)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "42efd22f-8e39-4c65-ba13-92e0cc71b711",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e75c7c9cfae8c0a3acae5cba856e3261ac695fa2387245389b020ac0596653b7"
+  },
+  "id": "AruyZG6zO6Y56Mnl",
+  "tags": [
+    {
+      "createdAt": "2025-04-11T05:51:23.291Z",
+      "updatedAt": "2025-04-11T05:51:23.291Z",
+      "id": "hpZojOeCjJ7IX8DO",
+      "name": "MAIN"
+    }
+  ]
+}
